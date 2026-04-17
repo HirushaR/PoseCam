@@ -59,6 +59,10 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Pose Cam needs the camera to show a live preview and guide your pose.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Pose Cam saves your captured photos to your library when you choose Save.</string>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
