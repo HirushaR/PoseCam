@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
 
 class PoseCamApp extends StatelessWidget {
   const PoseCamApp({super.key});
@@ -16,7 +16,7 @@ class PoseCamApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const HomeScreen(),
+      home: const LoginScreen(),
     );
   }
 }
