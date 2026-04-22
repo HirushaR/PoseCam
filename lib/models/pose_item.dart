@@ -10,7 +10,8 @@ class PoseItem {
     required this.categoryId,
     required this.rules,
     required this.thumbnailAsset,
-    required this.guideOutline,
+    this.guideOutline = const [],
+    this.outlineImageAsset,
   });
 
   final String id;
@@ -23,4 +24,8 @@ class PoseItem {
 
   /// Normalized polyline for static guide overlay (camera preview space).
   final List<Offset> guideOutline;
+
+  /// When set, this image is drawn as the camera ghost overlay instead of
+  /// [guideOutline].
+  final String? outlineImageAsset;
 }

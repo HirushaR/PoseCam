@@ -9,28 +9,28 @@ const String kPlaceholderThumb = 'assets/placeholders/placeholder.png';
 
 final List<PoseCategory> poseCategories = [
   const PoseCategory(
-    id: 'selfie',
-    name: 'Selfie',
-    description: 'Face-forward and upper-body poses.',
+    id: 'man',
+    name: 'Man',
+    description: 'Solo poses for men.',
   ),
   const PoseCategory(
-    id: 'nature',
-    name: 'Nature',
-    description: 'Outdoor, relaxed full-body poses.',
+    id: 'weman',
+    name: 'Weman',
+    description: 'Solo poses for women.',
   ),
   const PoseCategory(
-    id: 'graduation',
-    name: 'Graduation',
-    description: 'Classic grad cap and diploma moments.',
+    id: 'couples',
+    name: 'Couples',
+    description: 'Pair and partner pose ideas.',
   ),
 ];
 
 final List<PoseItem> poseItems = [
-  // Selfie
+  // Man
   PoseItem(
     id: 'selfie_chin_tilt',
     name: 'Chin Tilt',
-    categoryId: 'selfie',
+    categoryId: 'man',
     thumbnailAsset: kPlaceholderThumb,
     guideOutline: _outlineChinTilt(),
     rules: [
@@ -69,7 +69,7 @@ final List<PoseItem> poseItems = [
   PoseItem(
     id: 'selfie_soft_angle',
     name: 'Soft Angle',
-    categoryId: 'selfie',
+    categoryId: 'man',
     thumbnailAsset: kPlaceholderThumb,
     guideOutline: _outlineSoftAngle(),
     rules: [
@@ -108,7 +108,7 @@ final List<PoseItem> poseItems = [
   PoseItem(
     id: 'selfie_overhead',
     name: 'Overhead Look',
-    categoryId: 'selfie',
+    categoryId: 'man',
     thumbnailAsset: kPlaceholderThumb,
     guideOutline: _outlineOverhead(),
     rules: [
@@ -138,11 +138,11 @@ final List<PoseItem> poseItems = [
       ),
     ],
   ),
-  // Nature
+  // Weman
   PoseItem(
     id: 'nature_walk',
     name: 'Walk Pose',
-    categoryId: 'nature',
+    categoryId: 'weman',
     thumbnailAsset: kPlaceholderThumb,
     guideOutline: _outlineWalk(),
     rules: [
@@ -181,7 +181,7 @@ final List<PoseItem> poseItems = [
   PoseItem(
     id: 'nature_side_look',
     name: 'Side Look',
-    categoryId: 'nature',
+    categoryId: 'weman',
     thumbnailAsset: kPlaceholderThumb,
     guideOutline: _outlineSideLook(),
     rules: [
@@ -220,7 +220,7 @@ final List<PoseItem> poseItems = [
   PoseItem(
     id: 'nature_hands_relaxed',
     name: 'Hands Relaxed',
-    categoryId: 'nature',
+    categoryId: 'weman',
     thumbnailAsset: kPlaceholderThumb,
     guideOutline: _outlineHandsRelaxed(),
     rules: [
@@ -253,11 +253,11 @@ final List<PoseItem> poseItems = [
       ),
     ],
   ),
-  // Graduation
+  // Couples
   PoseItem(
     id: 'grad_cap_raise',
     name: 'Cap Raise',
-    categoryId: 'graduation',
+    categoryId: 'couples',
     thumbnailAsset: kPlaceholderThumb,
     guideOutline: _outlineCapRaise(),
     rules: [
@@ -293,7 +293,7 @@ final List<PoseItem> poseItems = [
   PoseItem(
     id: 'grad_certificate',
     name: 'Certificate Hold',
-    categoryId: 'graduation',
+    categoryId: 'couples',
     thumbnailAsset: kPlaceholderThumb,
     guideOutline: _outlineCertificate(),
     rules: [
@@ -329,7 +329,7 @@ final List<PoseItem> poseItems = [
   PoseItem(
     id: 'grad_side_smile',
     name: 'Side Smile',
-    categoryId: 'graduation',
+    categoryId: 'couples',
     thumbnailAsset: kPlaceholderThumb,
     guideOutline: _outlineSideSmile(),
     rules: [
@@ -362,13 +362,31 @@ final List<PoseItem> poseItems = [
       ),
     ],
   ),
+  ...List<PoseItem>.generate(9, (i) {
+    final n = i + 1;
+    final categoryId = n <= 3
+        ? 'man'
+        : (n <= 6 ? 'weman' : 'couples');
+    return PoseItem(
+      id: 'ref_pose_$n',
+      name: 'Pose $n',
+      categoryId: categoryId,
+      thumbnailAsset: 'assets/poses/$n.jpg',
+      outlineImageAsset: 'assets/outlines/$n.png',
+      guideOutline: const [],
+      rules: const [],
+    );
+  }),
 ];
 
 List<PoseItem> posesForCategory(String categoryId) {
   return poseItems.where((p) => p.categoryId == categoryId).toList();
 }
 
-PoseItem? poseById(String id) {
+PoseItem? poseById(String? id) {
+  if (id == null || id.isEmpty) {
+    return null;
+  }
   try {
     return poseItems.firstWhere((p) => p.id == id);
   } catch (_) {

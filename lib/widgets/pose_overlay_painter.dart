@@ -7,6 +7,7 @@ class PoseOverlayPainter extends CustomPainter {
     required this.mirror,
     this.lineColor = const Color(0x99FFFFFF),
     this.strokeWidth = 3,
+    this.scale = 1.0,
   });
 
   final List<Offset> normalizedPoints;
@@ -14,10 +15,21 @@ class PoseOverlayPainter extends CustomPainter {
   final Color lineColor;
   final double strokeWidth;
 
+  /// Uniform scale around the center of the preview (1 = default size).
+  final double scale;
+
   @override
   void paint(Canvas canvas, Size size) {
     if (normalizedPoints.length < 2) {
       return;
+    }
+    canvas.save();
+    if (scale != 1.0) {
+      final cx = size.width / 2;
+      final cy = size.height / 2;
+      canvas.translate(cx, cy);
+      canvas.scale(scale);
+      canvas.translate(-cx, -cy);
     }
     final paint = Paint()
       ..color = lineColor
@@ -51,12 +63,14 @@ class PoseOverlayPainter extends CustomPainter {
       final p = Offset(nx * size.width, ny * size.height);
       canvas.drawCircle(p, 3, dot);
     }
+    canvas.restore();
   }
 
   @override
   bool shouldRepaint(covariant PoseOverlayPainter oldDelegate) {
     return oldDelegate.normalizedPoints != normalizedPoints ||
         oldDelegate.mirror != mirror ||
-        oldDelegate.lineColor != lineColor;
+        oldDelegate.lineColor != lineColor ||
+        oldDelegate.scale != scale;
   }
 }

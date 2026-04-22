@@ -21,6 +21,10 @@ import '../widgets/score_card.dart';
 import '../widgets/skeleton_painter.dart';
 import 'result_screen.dart';
 
+const double _kOutlineScaleMin = 0.4;
+const double _kOutlineScaleMax = 2.0;
+const double _kOutlineScaleStep = 0.1;
+
 class CameraGuideScreen extends StatefulWidget {
   const CameraGuideScreen({
     super.key,
@@ -42,7 +46,7 @@ class _CameraGuideScreenState extends State<CameraGuideScreen>
   final PoseMatchService _poseMatch = PoseMatchService();
 
   List<PoseItem> _poses = [];
-  late String _selectedPoseId;
+  String? _selectedPoseId;
   bool _loading = true;
   String? _error;
 
@@ -56,6 +60,9 @@ class _CameraGuideScreenState extends State<CameraGuideScreen>
   String _hint = '';
   bool _showScore = true;
 
+  /// Uniform scale for the guide outline (bitmap or vector).
+  double _outlineScale = 1.0;
+
   /// True when the last failure was missing camera permission (retry after Settings).
   bool _permissionError = false;
 
@@ -64,8 +71,12 @@ class _CameraGuideScreenState extends State<CameraGuideScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _poses = posesForCategory(widget.categoryId);
-    _selectedPoseId = widget.initialPoseId ??
-        (_poses.isNotEmpty ? _poses.first.id : '');
+    final initial = widget.initialPoseId;
+    if (initial != null &&
+        initial.isNotEmpty &&
+        _poses.any((p) => p.id == initial)) {
+      _selectedPoseId = initial;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
   }
 
@@ -201,6 +212,75 @@ class _CameraGuideScreenState extends State<CameraGuideScreen>
   }
 
   PoseItem? get _selectedPose => poseById(_selectedPoseId);
+
+  bool _poseHasGuideOverlay(PoseItem? p) {
+    return p != null &&
+        (p.outlineImageAsset != null || p.guideOutline.isNotEmpty);
+  }
+
+  void _nudgeOutlineScale(double delta) {
+    setState(() {
+      _outlineScale = (_outlineScale + delta).clamp(
+        _kOutlineScaleMin,
+        _kOutlineScaleMax,
+      );
+    });
+  }
+
+  Future<void> _showPosePreviewDialog(PoseItem pose) async {
+    if (!mounted) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        final isSelected = _selectedPoseId == pose.id;
+        return AlertDialog(
+          title: Text(pose.name),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320, maxHeight: 420),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: InteractiveViewer(
+                minScale: 1,
+                maxScale: 4,
+                child: Image.asset(
+                  pose.thumbnailAsset,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Icon(Icons.broken_image, size: 48),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            if (isSelected)
+              FilledButton(
+                onPressed: () {
+                  setState(() => _selectedPoseId = null);
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Deselect'),
+              )
+            else
+              FilledButton(
+                onPressed: () {
+                  setState(() => _selectedPoseId = pose.id);
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Select'),
+              ),
+          ],
+        );
+      },
+    );
+  }
 
   Future<void> _switchCamera() async {
     await _stopImageStream();
@@ -358,12 +438,41 @@ class _CameraGuideScreenState extends State<CameraGuideScreen>
             fit: StackFit.expand,
             children: [
               CameraPreview(controller),
-              CustomPaint(
-                painter: PoseOverlayPainter(
-                  normalizedPoints: item?.guideOutline ?? const [],
-                  mirror: mirror,
+              if (item case final p? when p.outlineImageAsset != null)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Center(
+                      child: Transform.flip(
+                        flipX: mirror,
+                        child: Transform.scale(
+                          scale: _outlineScale,
+                          alignment: Alignment.center,
+                          child: Opacity(
+                            opacity: 0.55,
+                            child: ColorFiltered(
+                              colorFilter: const ColorFilter.mode(
+                                Colors.white,
+                                BlendMode.srcIn,
+                              ),
+                              child: Image.asset(
+                                p.outlineImageAsset!,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              else if (item case final p? when p.guideOutline.isNotEmpty)
+                CustomPaint(
+                  painter: PoseOverlayPainter(
+                    normalizedPoints: p.guideOutline,
+                    mirror: mirror,
+                    scale: _outlineScale,
+                  ),
                 ),
-              ),
               CustomPaint(
                 painter: SkeletonPainter(
                   landmarks: skeletonPoints,
@@ -420,7 +529,13 @@ class _CameraGuideScreenState extends State<CameraGuideScreen>
                     const Spacer(),
                     Center(
                       child: HintBanner(
-                        message: _hint.isEmpty ? 'Match the outline' : _hint,
+                        message: _hint.isNotEmpty
+                            ? _hint
+                            : (item == null
+                                ? (_livePose == null
+                                    ? 'Step into the frame'
+                                    : 'Tap a pose to preview and select')
+                                : 'Match the outline'),
                         visible: true,
                       ),
                     ),
@@ -428,13 +543,62 @@ class _CameraGuideScreenState extends State<CameraGuideScreen>
                     Center(
                       child: ScoreCard(score: _score, visible: _showScore),
                     ),
+                    if (_poseHasGuideOverlay(item)) ...[
+                      const SizedBox(height: 8),
+                      Center(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                tooltip: 'Smaller outline',
+                                onPressed: _outlineScale > _kOutlineScaleMin
+                                    ? () => _nudgeOutlineScale(-_kOutlineScaleStep)
+                                    : null,
+                                icon: const Icon(
+                                  Icons.zoom_out,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                child: Text(
+                                  'Outline ${_outlineScale.toStringAsFixed(1)}×',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                tooltip: 'Larger outline',
+                                onPressed: _outlineScale < _kOutlineScaleMax
+                                    ? () => _nudgeOutlineScale(_kOutlineScaleStep)
+                                    : null,
+                                icon: const Icon(
+                                  Icons.zoom_in,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     PoseThumbnailList(
                       poses: _poses,
                       selectedId: _selectedPoseId,
-                      onSelect: (p) {
-                        setState(() => _selectedPoseId = p.id);
-                      },
+                      onNoneTap: () => setState(() => _selectedPoseId = null),
+                      onPoseTap: _showPosePreviewDialog,
                     ),
                     const SizedBox(height: 8),
                     CaptureControls(
@@ -445,8 +609,9 @@ class _CameraGuideScreenState extends State<CameraGuideScreen>
                           builder: (ctx) => AlertDialog(
                             title: const Text('Pose guide'),
                             content: const Text(
-                              'Use the outline to align your body. '
-                              'Switch poses with the strip below. '
+                              'Tap a pose thumbnail to preview it, then choose '
+                              'Select to show its outline on the camera, or '
+                              'None / Deselect to hide the guide. '
                               'Hints update as you move.',
                             ),
                             actions: [
